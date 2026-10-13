@@ -1,0 +1,14 @@
+# Copy to terraform.tfvars and adjust.
+project_name        = "demo"
+region              = "blr1"
+node_size           = "s-2vcpu-4gb"
+node_count          = 2
+bastion_size        = "s-1vcpu-1gb"
+ssh_public_key_path = "~/.ssh/id_rsa.pub"
+
+# Strongly recommended: only allow SSH from your own IP.
+ssh_allowed_cidrs = ["203.0.113.5/32"]
+
+# Kubernetes API is reachable only from the bastion; add your IP here to run kubectl locally too.
+restrict_api_to_bastion = true
+api_extra_allowed_cidrs = []

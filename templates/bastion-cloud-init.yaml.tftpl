@@ -1,0 +1,29 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+
+packages:
+  - curl
+  - jq
+  - fail2ban
+  - unattended-upgrades
+
+write_files:
+  - path: /etc/ssh/sshd_config.d/99-hardening.conf
+    content: |
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin prohibit-password
+      AllowTcpForwarding yes
+      X11Forwarding no
+
+runcmd:
+  - systemctl enable --now fail2ban
+  - systemctl restart ssh || systemctl restart sshd
+  # kubectl (latest stable)
+  - curl -fsSLo /usr/local/bin/kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+  - chmod +x /usr/local/bin/kubectl
+  # doctl (DigitalOcean CLI)
+  - snap install doctl
+  # helm
+  - curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
