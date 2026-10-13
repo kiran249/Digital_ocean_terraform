@@ -28,17 +28,65 @@ Provisions:
 
 ## Prerequisites
 
-- Terraform >= 1.5
+- Terraform >= 1.6
 - A DigitalOcean API token with read/write scope
+- A DigitalOcean Spaces bucket + Spaces access key for the Terraform state
 - An SSH key pair (default: `~/.ssh/id_rsa.pub`)
 
-## Usage
+## Running from Jenkins
+
+The repo includes a `Jenkinsfile` (declarative pipeline).
+
+### 1. One-time DigitalOcean setup
+1. **API token:** DO console > API > Generate New Token (read + write).
+2. **State bucket:** DO console > Spaces > Create bucket (e.g. `my-terraform-state` in `blr1`). Keep it private.
+3. **Spaces keys:** DO console > API > Spaces Keys > Generate New Key.
+
+### 2. Jenkins credentials (Manage Jenkins > Credentials > Global)
+
+| ID | Kind | Value |
+|---|---|---|
+| `do-api-token` | Secret text | DigitalOcean API token |
+| `do-spaces-keys` | Username with password | username = Spaces access key, password = Spaces secret key |
+| `do-bastion-ssh-pubkey` | Secret file | Your SSH **public** key (`id_rsa.pub` / `id_ed25519.pub`) |
+
+### 3. Jenkins job
+- Required plugins (normally installed by default): Pipeline, Git, Credentials Binding.
+- Agent: a Linux agent with `curl` and `unzip`. The pipeline downloads Terraform itself into the workspace.
+- New Item > **Pipeline** > *Pipeline script from SCM* > Git > this repo, branch of your choice, script path `Jenkinsfile`.
+- The **first** build only registers the parameters (Jenkins doesn't know about them yet). After that, use **Build with Parameters**.
+
+### 4. Build parameters
+
+| Parameter | Default | Notes |
+|---|---|---|
+| `ACTION` | `plan` | `plan`, `apply` or `destroy` |
+| `PROJECT_NAME` | `demo` | Resource prefix; also the state key (`<name>/terraform.tfstate`) |
+| `REGION` | `blr1` | Cluster/bastion region |
+| `NODE_COUNT` | `2` | Worker nodes |
+| `SSH_ALLOWED_CIDRS` | *(empty)* | **Required** for plan/apply, e.g. `203.0.113.5/32` |
+| `API_EXTRA_ALLOWED_CIDRS` | *(empty)* | Extra IPs allowed to reach the K8s API |
+| `STATE_BUCKET` | `my-terraform-state` | Your Spaces bucket |
+| `STATE_REGION` | `blr1` | Region of that bucket |
+| `AUTO_APPROVE` | `false` | Skip the manual approval step |
+
+### Pipeline stages
+`Check parameters` → `Install Terraform` → `Init` (Spaces backend) → `Validate` → `Plan` (archives `tfplan.txt`) → `Approval` (manual, 30 min) → `Apply` → `Outputs`
+
+Use `apply` to create or update the infrastructure, and `destroy` to tear it down. Both stop at an approval prompt that shows the plan. The kubeconfig is never printed or archived. Get it from the bastion with `doctl`, as described below.
+
+Spaces has no state locking, so the pipeline uses `disableConcurrentBuilds()`. Don't run Terraform locally against the same state while a build is running.
+
+## Local usage
 
 ```bash
 export DIGITALOCEAN_TOKEN="dop_v1_xxx"
+export AWS_ACCESS_KEY_ID="<spaces access key>"
+export AWS_SECRET_ACCESS_KEY="<spaces secret key>"
 
+cp backend.hcl.example backend.hcl             # edit bucket/key/endpoint
 cp terraform.tfvars.example terraform.tfvars   # edit: set ssh_allowed_cidrs to your IP!
-terraform init
+terraform init -backend-config=backend.hcl
 terraform plan
 terraform apply
 ```
@@ -91,5 +139,5 @@ terraform destroy
 
 ## Notes
 
-- State contains the kubeconfig and is sensitive — use a remote backend (e.g. DO Spaces / S3) with encryption for team use.
+- State contains the kubeconfig and is sensitive. Keep the Spaces bucket private and its keys restricted.
 - DOKS worker nodes are managed by DigitalOcean and don't accept your SSH key; the bastion is your secure entry point for `kubectl`/`helm` and for reaching private in-VPC services.

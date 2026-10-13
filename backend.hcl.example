@@ -1,0 +1,4 @@
+# Copy to backend.hcl for local runs (Jenkins generates its own).
+bucket    = "my-terraform-state"
+key       = "demo/terraform.tfstate"
+endpoints = { s3 = "https://blr1.digitaloceanspaces.com" }

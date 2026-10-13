@@ -6,3 +6,7 @@
 crash.log
 kubeconfig*.yaml
 .terraform.tfstate.lock.info
+backend.hcl
+.tfbin/
+tfplan
+tfplan.txt
