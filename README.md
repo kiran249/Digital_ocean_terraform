@@ -33,6 +33,8 @@ Provisions:
 - A DigitalOcean Spaces bucket + Spaces access key for the Terraform state
 - An SSH key pair (default: `~/.ssh/id_rsa.pub`)
 
+See [PREREQUISITES.md](PREREQUISITES.md) for the full checklist.
+
 ## Running from Jenkins
 
 The repo includes a `Jenkinsfile` (declarative pipeline).
